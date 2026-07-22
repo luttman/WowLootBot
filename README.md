@@ -7,8 +7,8 @@ through slash commands so the channel does not get spammed.
 
 ## Requirements
 
-- Node.js 18 or newer (uses the built-in `fetch`), or Docker (see "Running with
-  Docker" below) if you would rather not install Node.js at all
+- Node.js 22 or newer (required by `better-sqlite3`), or Docker (see "Running
+  with Docker" below) if you would rather not install Node.js at all
 - A Discord bot application (see Setup below)
 
 ## Setup
