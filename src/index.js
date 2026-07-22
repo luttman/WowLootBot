@@ -203,14 +203,16 @@ async function handleLootRaid(interaction) {
 async function handleLootPlayer(interaction) {
   const query = interaction.options.getString('name');
   const rows = db.prepare(`SELECT loot.* FROM loot JOIN raids ON loot.raid_id = raids.id
-    WHERE raids.guild_id = ? AND loot.player LIKE ? ORDER BY loot.id DESC LIMIT 50`).all(interaction.guildId, `%${query}%`);
+    WHERE raids.guild_id = ? AND loot.player LIKE ?
+    ORDER BY loot.item_date DESC, loot.id DESC LIMIT 50`).all(interaction.guildId, `%${query}%`);
   await replyPaginated(interaction, `Loot won by ${query}`, rows);
 }
 
 async function handleLootItem(interaction) {
   const query = interaction.options.getString('name');
   const rows = db.prepare(`SELECT loot.* FROM loot JOIN raids ON loot.raid_id = raids.id
-    WHERE raids.guild_id = ? AND loot.item_name LIKE ? ORDER BY loot.id DESC LIMIT 50`).all(interaction.guildId, `%${query}%`);
+    WHERE raids.guild_id = ? AND loot.item_name LIKE ?
+    ORDER BY loot.item_date DESC, loot.id DESC LIMIT 50`).all(interaction.guildId, `%${query}%`);
   await replyPaginated(interaction, `Winners of "${query}"`, rows);
 }
 
