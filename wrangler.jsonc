@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wowlootbot",
+  "name": "wowlootbotgh",
   "compatibility_date": "2026-07-22",
   "assets": {
     "directory": "./website"
