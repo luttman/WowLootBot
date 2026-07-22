@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy - WoWLootBot</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<nav class="site-nav">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <img class="brand-mark" src="assets/logo.png" alt="" aria-hidden="true">
+      WoWLootBot
+    </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+    </div>
+  </div>
+</nav>
+
+<main class="legal" id="main-content">
+  <div class="wrap">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: fill in the date you publish this page</p>
+
+    <p>This page explains what WoWLootBot ("the bot") stores, why, and how to get it
+    removed. It's written in plain language on purpose; if anything is unclear,
+    use the contact details at the bottom.</p>
+
+    <h2>What's stored</h2>
+    <p>When a loot master runs <code>/loot-add</code>, the bot stores the contents of
+    the export they upload:</p>
+    <ul>
+      <li>World of Warcraft character names of who won each item</li>
+      <li>Item names and the in-game item ID</li>
+      <li>The raid date, boss name, and roll type (e.g. main spec, off spec) when the
+      export includes them</li>
+      <li>Any note the loot council left on an award</li>
+      <li>The Discord username of whoever ran <code>/loot-add</code>, credited as the
+      loot master for that raid unless overridden</li>
+    </ul>
+    <p>The bot also stores a small amount of configuration per Discord server:</p>
+    <ul>
+      <li>The server's Discord ID, so data from different servers never mixes</li>
+      <li>A role ID and/or channel ID, if a server sets one with
+      <code>/loot-config</code></li>
+    </ul>
+
+    <h2>What's not stored</h2>
+    <p>The bot cannot read regular chat messages. It only sees the input of the
+    slash commands listed on the home page. It never collects passwords, payment
+    information, emails, or Discord account details beyond a username and the IDs
+    listed above.</p>
+
+    <h2>Where it's stored</h2>
+    <p>Data lives in a single database operated for this bot. It is not sold, and
+    it is not shared with advertisers or other third parties. Fill in details here
+    if you use a specific hosting provider you want to disclose.</p>
+
+    <h2>How long it's kept</h2>
+    <p>Loot history is kept until a server's loot master deletes it with
+    <code>/loot-clear</code>, or until the bot is removed from the server, at which
+    point that server's data is deleted within a reasonable period. There's no
+    automatic expiry before then, since the point of the bot is to keep a long-term
+    record.</p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>Any loot master can delete a single raid or an entire server's history at
+      any time with <code>/loot-clear</code>.</li>
+      <li>A server admin can restrict who is allowed to add or delete loot data with
+      <code>/loot-config</code>.</li>
+      <li>Removing the bot from your server stops all data collection immediately.</li>
+    </ul>
+
+    <h2>Changes to this policy</h2>
+    <p>If what's collected or how it's used changes meaningfully, this page will be
+    updated and the date at the top will change.</p>
+
+    <h2>Contact</h2>
+    <p>To ask about stored data or request deletion outside of
+    <code>/loot-clear</code>: <a href="mailto:contact@wowlootbot.xyz">contact@wowlootbot.xyz</a></p>
+  </div>
+</main>
+
+</body>
+</html>

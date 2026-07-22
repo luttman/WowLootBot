@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WoWLootBot - Raid loot history for your Discord server</title>
+<meta name="description" content="Paste an RCLootCouncil or Gargul export into Discord and WoWLootBot remembers who got what, forever. Slash commands only, nothing spams the channel.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<nav class="site-nav">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <img class="brand-mark" src="assets/logo.png" alt="" aria-hidden="true">
+      WoWLootBot
+    </a>
+    <div class="nav-links">
+      <a href="#screenshots" class="link-label">Screenshots</a>
+      <a href="#commands" class="link-label">Commands</a>
+      <a href="#faq" class="link-label">FAQ</a>
+      <a href="https://discord.com/oauth2/authorize?client_id=1528425618608361502&scope=bot+applications.commands&permissions=19456" class="btn btn-primary btn-small">Add to Discord</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="main-content">
+  <div class="wrap">
+    <h1>Never argue about who got that trinket.</h1>
+    <p class="lede">
+      Your loot master pastes one export after raid. WoWLootBot remembers every
+      item, every player, every date, so anyone can look it up later instead of
+      scrolling last month's chat log. Slash commands only, so the channel stays
+      clean.
+    </p>
+    <div class="hero-actions">
+      <a href="https://discord.com/oauth2/authorize?client_id=1528425618608361502&scope=bot+applications.commands&permissions=19456" class="btn btn-primary">
+        Add WoWLootBot to Discord
+      </a>
+      <a href="#commands" class="btn btn-secondary">See the commands</a>
+    </div>
+  </div>
+</header>
+
+<section id="screenshots">
+  <div class="wrap">
+    <div class="screenshot-grid">
+      <figure>
+        <img src="assets/preview-loot-raid.png" alt="Discord reply to /loot-raid showing a list of items won during a raid, each with the winner, item name, roll type, boss, date, and loot master.">
+        <figcaption><code>/loot-raid</code> - items from one raid</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/preview-loot-player.png" alt="Discord reply to /loot-player showing everything one player has won across multiple raids, each with the item name, roll type, boss, date, and loot master.">
+        <figcaption><code>/loot-player</code> - everything a player has won</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Why bother</p>
+      <h2>Built for the thing loot masters actually do</h2>
+      <p>Nobody wants to run a spreadsheet during a raid. WoWLootBot fits into the two-minute window right after the boss dies.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon" aria-hidden="true">1</div>
+        <h3>Paste, don't type</h3>
+        <p>Upload the raw export from RCLootCouncil or Gargul. It's parsed automatically, no reformatting.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon" aria-hidden="true">2</div>
+        <h3>Duplicates are ignored</h3>
+        <p>Re-upload the same export by accident and nothing gets double-counted.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon" aria-hidden="true">3</div>
+        <h3>You choose who can add loot</h3>
+        <p>Restrict uploads to an officer role and, if you like, to one channel.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon" aria-hidden="true">4</div>
+        <h3>Answers are private</h3>
+        <p>Every lookup replies only to the person who asked. The channel stays clean.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="exports">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Supported exports</p>
+      <h2>Auto-detected, no format to pick</h2>
+      <p>Drop in whichever your loot council addon gives you. WoWLootBot figures out the rest.</p>
+    </div>
+    <div class="export-row">
+      <span class="export-tag"><span class="dot"></span>RCLootCouncil CSV</span>
+      <span class="export-tag"><span class="dot"></span>RCLootCouncil JSON</span>
+      <span class="export-tag"><span class="dot"></span>Gargul JSON</span>
+    </div>
+  </div>
+</section>
+
+<section id="commands">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Commands</p>
+      <h2>Everything is a slash command</h2>
+      <p>Type <code>/</code> in any channel the bot can see and Discord will show these with autocomplete.</p>
+    </div>
+    <div class="command-columns">
+      <div class="command-column">
+        <h3>For everyone</h3>
+        <p class="column-note">Read-only. Results are private to whoever asks.</p>
+        <ul class="command-list">
+          <li><code>/loot-last</code><p>Items from the most recently added raid.</p></li>
+          <li><code>/loot-raid</code><p>Items from a specific raid, picked from a dropdown.</p></li>
+          <li><code>/loot-player</code><p>Everything a player has won.</p></li>
+          <li><code>/loot-item</code><p>Who has won a specific item.</p></li>
+          <li><code>/help</code><p>A guide to every command, in Discord.</p></li>
+        </ul>
+      </div>
+      <div class="command-column">
+        <h3>For loot masters</h3>
+        <p class="column-note">Restricted to an officer role or Manage Server by default.</p>
+        <ul class="command-list">
+          <li><code>/loot-add</code><p>Upload an export. Splits into one raid per date automatically.</p></li>
+          <li><code>/loot-clear</code><p>Delete one raid, or everything for the server.</p></li>
+          <li><code>/loot-config</code><p>Set the officer role and, optionally, lock commands to one channel.</p></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Questions</p>
+      <h2>Before you add it</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Does it cost anything?</summary>
+        <p>No. There's no paid tier and no usage limit.</p>
+      </details>
+      <details class="faq-item">
+        <summary>What data does it keep?</summary>
+        <p>Only what's in the loot export you upload (player names, item names, dates) plus the server, channel, and role IDs needed to run the commands. See the <a href="privacy.html">Privacy Policy</a> for the full list.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can other servers see our loot history?</summary>
+        <p>No. Every server's data is kept separate and one server can never query another's.</p>
+      </details>
+      <details class="faq-item">
+        <summary>What if someone uploads the wrong file?</summary>
+        <p><code>/loot-clear</code> can remove a single raid, or wipe everything for the server if you'd rather start over.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Which WoW versions does it work with?</summary>
+        <p>Any version RCLootCouncil or Gargul supports. The bot only reads the exported text, it doesn't care which expansion or realm it came from.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="wrap">
+    <h2>Stop scrolling old chat logs.</h2>
+    <a href="https://discord.com/oauth2/authorize?client_id=1528425618608361502&scope=bot+applications.commands&permissions=19456" class="btn btn-primary">
+      Add WoWLootBot to Discord
+    </a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="fine-print">WoWLootBot is not affiliated with or endorsed by Blizzard Entertainment.</p>
+    <div class="footer-links">
+      <a href="terms.html">Terms of Service</a>
+      <a href="privacy.html">Privacy Policy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
