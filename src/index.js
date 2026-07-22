@@ -6,6 +6,7 @@ const { parseLootExport } = require('./parseLoot');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const PAGE_SIZE = 10;
+const CHANNEL_LOCK_EXEMPT = new Set(['loot-config', 'help', 'admin-status']);
 const BUTTON_TIMEOUT_MS = 5 * 60 * 1000; // how long Prev/Next buttons stay clickable before they're disabled
 
 // Player and owner names come as "Name-Realm" from the addons. We only display the name.
@@ -25,6 +26,24 @@ const NO_PERMISSION_REPLY = {
   content: "You don't have permission to manage loot in this server. Ask an admin to grant you the loot-officer role, or to run /loot-config.",
   flags: MessageFlags.Ephemeral,
 };
+
+// Small in-memory ring buffer so /admin-status can show recent errors without
+// needing a logging service. Lost on restart, which is fine, Docker/host logs
+// (console.error below) are still the durable record.
+const RECENT_ERRORS = [];
+const MAX_RECENT_ERRORS = 10;
+function recordError(context, err) {
+  console.error(context, err);
+  RECENT_ERRORS.unshift({ time: new Date().toISOString(), context, message: err?.message || String(err) });
+  RECENT_ERRORS.length = Math.min(RECENT_ERRORS.length, MAX_RECENT_ERRORS);
+}
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${d}d ${h}h ${m}m`;
+}
 
 // Formats one loot row for display. Each row keeps its own date/owner (not the raid's),
 // since a single import can span multiple actual raid nights and loot masters.
@@ -318,6 +337,36 @@ async function handleHelp(interaction) {
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
+// Owner-only health check. Gated two ways: the command itself requires Administrator
+// (so regular members never see it), and this checks the specific Discord account on
+// top of that, since Discord has no native "only this one user" command visibility.
+async function handleAdminStatus(interaction) {
+  if (interaction.user.id !== process.env.OWNER_ID) {
+    return interaction.reply({ content: 'Not authorized.', flags: MessageFlags.Ephemeral });
+  }
+
+  const { raids, loot } = db.prepare(`SELECT
+    (SELECT COUNT(*) FROM raids) AS raids,
+    (SELECT COUNT(*) FROM loot) AS loot`).get();
+
+  const errorsText = RECENT_ERRORS.length
+    ? RECENT_ERRORS.map((e) => `${e.time} [${e.context}] ${e.message}`).join('\n').slice(0, 1000)
+    : 'None since last restart.';
+
+  const embed = new EmbedBuilder()
+    .setTitle('WoWLootBot status')
+    .addFields(
+      { name: 'Servers', value: String(client.guilds.cache.size), inline: true },
+      { name: 'Uptime', value: formatUptime(process.uptime()), inline: true },
+      { name: 'Discord ping', value: `${client.ws.ping}ms`, inline: true },
+      { name: 'Memory (RSS)', value: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`, inline: true },
+      { name: 'Node', value: process.version, inline: true },
+      { name: 'Stored data', value: `${raids} raids, ${loot} loot entries`, inline: true },
+      { name: `Recent errors (last ${MAX_RECENT_ERRORS})`, value: errorsText },
+    );
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+}
+
 // Fires as the user types in /loot-raid's `name` field. Discord shows the returned
 // list as a clickable dropdown; the `value` sent back is the raid id, not its name.
 async function handleLootRaidAutocomplete(interaction) {
@@ -335,8 +384,9 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   try {
     // If a server locked commands to one channel via /loot-config, enforce it here for
-    // everything except /loot-config and /help, so the setting can always be changed.
-    if (interaction.commandName !== 'loot-config' && interaction.commandName !== 'help') {
+    // everything except /loot-config and /help (so the setting can always be changed)
+    // and /admin-status (owner-only, should work from any server/channel).
+    if (!CHANNEL_LOCK_EXEMPT.has(interaction.commandName)) {
       const settings = db.prepare('SELECT channel_id FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
       if (settings?.channel_id && interaction.channelId !== settings.channel_id) {
         return interaction.reply({ content: `This command only works in <#${settings.channel_id}>.`, flags: MessageFlags.Ephemeral });
@@ -354,13 +404,24 @@ client.on('interactionCreate', async (interaction) => {
       case 'loot-clear': return await handleLootClear(interaction);
       case 'loot-config': return await handleLootConfig(interaction);
       case 'help': return await handleHelp(interaction);
+      case 'admin-status': return await handleAdminStatus(interaction);
     }
   } catch (err) {
-    console.error(err);
+    recordError(`command:${interaction.commandName}`, err);
     const reply = { content: 'Something went wrong.', flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) await interaction.followUp(reply);
     else await interaction.reply(reply);
   }
+});
+
+// Covers errors outside the interaction handler (e.g. a failed API call in a timer).
+// uncaughtException exits after logging, since continuing to run after a genuinely
+// uncaught error risks corrupted in-memory state; Docker's restart policy brings it
+// back up. unhandledRejection is logged but does not exit, matching Node's default.
+process.on('unhandledRejection', (err) => recordError('unhandledRejection', err));
+process.on('uncaughtException', (err) => {
+  recordError('uncaughtException', err);
+  process.exit(1);
 });
 
 client.once('clientReady', () => console.log(`Logged in as ${client.user.tag}`));

@@ -28,6 +28,10 @@ through slash commands so the channel does not get spammed.
    - `GUILD_ID`: your Discord server's ID (enable Developer Mode in Discord,
      right click the server icon, Copy Server ID). Optional, but commands
      appear instantly with it set instead of up to an hour later.
+   - `OWNER_ID`: your own Discord user ID (right click your own name with
+     Developer Mode on, Copy User ID). Only this account can use
+     `/admin-status`. Optional, but that command replies "Not authorized" to
+     everyone, including you, until it is set.
    - `DB_PATH`: optional, defaults to `loot.db` in the project folder
 
 3. Invite the bot to your server. In the Developer Portal, OAuth2 > URL
@@ -104,6 +108,14 @@ For loot masters (Manage Server permission by default, or a role set with
 
 Results from the read commands are private (only visible to whoever ran the
 command) and paginated with buttons when there are more than 10 items.
+
+For the bot owner only (the Discord account in `OWNER_ID`):
+
+- `/admin-status`: server count, uptime, Discord API ping, memory usage, total
+  raids/loot rows stored, and the last 10 errors. Works from any server the
+  bot is in, replies "Not authorized" to anyone else who tries it. Requires
+  Administrator permission on top of the owner check, so regular members
+  never even see it in their command list.
 
 ## Supported export formats
 

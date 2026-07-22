@@ -43,6 +43,10 @@ const commands = [
       { name: 'Everyone (browsing loot)', value: 'everyone' },
       { name: 'Loot master (adding loot, exports)', value: 'lootmaster' },
     )),
+  new SlashCommandBuilder()
+    .setName('admin-status')
+    .setDescription('Bot health check (bot owner only)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
