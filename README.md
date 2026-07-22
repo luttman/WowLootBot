@@ -73,10 +73,11 @@ container instead, with `docker-compose.yml` and `Dockerfile` already set up.
    docker compose up -d --build
    ```
 
-Data is stored in a named Docker volume (`loot-data`), not a file on your
-host, so `docker compose down` and `docker compose up` again keeps your
-history. `docker compose down -v` deletes the volume along with it, only do
-that if you actually want to wipe all stored loot data.
+Data is stored in a `./data` folder next to `docker-compose.yml` (bind
+mounted into the container, not a named Docker volume), so it survives
+`docker compose down` and rebuilds. Moving to a bigger server later is just
+copying that folder over, e.g. `rsync` or `scp`, no Docker-specific export
+step needed since it is a single SQLite file.
 
 ## Commands
 

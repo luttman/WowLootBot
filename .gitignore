@@ -2,4 +2,5 @@ node_modules/
 .env
 *.db
 *.db-*
+/data/
 .claude/settings.local.json
