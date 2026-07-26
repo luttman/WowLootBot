@@ -140,19 +140,27 @@ addon.
 
 ## Warcraft Logs integration (/player-parse)
 
-`src/wcl.js` wraps the Warcraft Logs V1 API. It was built from the published
-API spec, not verified against a live key (no test key was available while
-writing it), the first real `/player-parse` call is effectively the first
-integration test. Two things worth checking once you have a real server set
-up with `/wcl-config`:
+`src/wcl.js` wraps the Warcraft Logs V1 API, using `classic.warcraftlogs.com`
+(not `www.warcraftlogs.com`, which is retail-only).
 
-- The percentile shown is derived from the API's `rank`/`outOf` fields
-  (`percentileFromRank()` in `wcl.js`), since the V1 spec doesn't document a
-  direct `percentile` field. If a real response does include one, that
-  function should prefer it instead.
-- `/player-parse`'s `zone` autocomplete lists whatever `/zones` returns for
-  that server's own API key, rather than a hardcoded tier list, so it reflects
-  whatever raids that Warcraft Logs account actually has access to.
+`/zones` returns two generations of zone entries, confirmed by live testing:
+
+- ids below 1500: one zone per raid *instance* (e.g. `1007` "Karazhan",
+  `1008` "Gruul / Magtheridon"). These no longer work with
+  `/parses/character` - they return no data even for characters with real
+  logged parses.
+- ids 1500+: one zone per raid *tier* (e.g. `1502` "TBC Raids (10-Man Tier
+  4)", grouping Karazhan, Gruul's Lair, and Magtheridon's Lair together),
+  which both works for character parses and matches what "tier" (T4, T5, ...)
+  means to this bot's users in the first place.
+
+`fetchZones()` filters to only the 1500+ generation, so `/player-parse`'s
+`zone` autocomplete only ever offers zones that actually return data.
+
+One thing still not verified against a live key: the percentile shown is
+derived from the API's `rank`/`outOf` fields (`percentileFromRank()` in
+`wcl.js`), since the V1 spec doesn't document a direct `percentile` field. If
+a real response does include one, that function should prefer it instead.
 
 ## Data storage
 

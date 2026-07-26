@@ -29,10 +29,23 @@ async function wclGet(path, params, apiKey) {
   return res.json();
 }
 
+// classic.warcraftlogs.com's /zones returns two generations of entries:
+// - ids below 1500: one zone per raid *instance* (e.g. 1007 "Karazhan",
+//   1008 "Gruul / Magtheridon"). Confirmed by testing that these no longer
+//   work with /parses/character - they return no data even for characters
+//   with real logged parses.
+// - ids 1500+: one zone per raid *tier* (e.g. 1502 "TBC Raids (10-Man Tier
+//   4)", grouping Karazhan + Gruul + Magtheridon together), which is both
+//   what actually works for character parses and matches what this bot's
+//   users mean by "tier" (T4, T5, ...) in the first place.
+// Only the 1500+ generation is exposed here.
+const MIN_USABLE_ZONE_ID = 1500;
+
 // List of raid zones this account's key can see, used to populate /player-parse's
 // zone autocomplete instead of a hardcoded tier->zone-id map that could go stale.
 async function fetchZones(apiKey) {
-  return wclGet('/zones', {}, apiKey);
+  const zones = await wclGet('/zones', {}, apiKey);
+  return (Array.isArray(zones) ? zones : []).filter((z) => z.id >= MIN_USABLE_ZONE_ID);
 }
 
 // character/realm split on the last "-", matching the "Name-Realm" convention
