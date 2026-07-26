@@ -58,11 +58,12 @@ const commands = [
       { name: 'KR', value: 'KR' },
       { name: 'TW', value: 'TW' },
     ))
-    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key and default region')),
+    .addStringOption((o) => o.setName('realm').setDescription("Default realm, e.g. 'Spineshatter', so /player-parse doesn't need Name-Realm"))
+    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key, default region, and default realm')),
   new SlashCommandBuilder()
     .setName('player-parse')
     .setDescription('Show a player\'s Warcraft Logs parses for a raid tier')
-    .addStringOption((o) => o.setName('player').setDescription("Character name, e.g. 'Fulfrans-Spineshatter'").setRequired(true))
+    .addStringOption((o) => o.setName('player').setDescription("Character name, e.g. 'Fulfrans' or 'Fulfrans-Spineshatter'").setRequired(true))
     .addStringOption((o) => o.setName('zone').setDescription('Start typing to pick a raid tier').setRequired(true).setAutocomplete(true))
     .addStringOption((o) => o.setName('region').setDescription('Overrides this server\'s default region').addChoices(
       { name: 'US', value: 'US' },

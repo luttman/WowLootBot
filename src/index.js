@@ -294,7 +294,7 @@ async function handleHelp(interaction) {
             '`/loot-add` - upload an export. Splits automatically into one raid per date.',
             '`/loot-clear` - delete a raid, or everything for this server (requires `confirm:true`).',
             '`/loot-config` - set which role (besides Manage Server) can use the two commands above, and optionally lock all commands to one channel.',
-            '`/wcl-config` - set this server\'s Warcraft Logs API key so `/player-parse` works.',
+            '`/wcl-config` - set this server\'s Warcraft Logs API key, default region, and default realm so `/player-parse` works with just a character name.',
           ].join('\n'),
         },
         {
@@ -378,30 +378,34 @@ async function handleAdminStatus(interaction) {
 async function handleWclConfig(interaction) {
   const apiKey = interaction.options.getString('api_key');
   const region = interaction.options.getString('region');
+  const realm = interaction.options.getString('realm');
   const reset = interaction.options.getBoolean('reset');
 
   if (reset) {
-    db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_region = NULL WHERE guild_id = ?').run(interaction.guildId);
-    return interaction.reply({ content: 'Removed this server\'s Warcraft Logs API key.', flags: MessageFlags.Ephemeral });
+    db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_region = NULL, wcl_realm = NULL WHERE guild_id = ?').run(interaction.guildId);
+    return interaction.reply({ content: 'Removed this server\'s Warcraft Logs API key, default region, and default realm.', flags: MessageFlags.Ephemeral });
   }
 
-  if (apiKey || region) {
-    db.prepare(`INSERT INTO guild_settings (guild_id, wcl_api_key, wcl_region) VALUES (?, ?, ?)
+  if (apiKey || region || realm) {
+    db.prepare(`INSERT INTO guild_settings (guild_id, wcl_api_key, wcl_region, wcl_realm) VALUES (?, ?, ?, ?)
       ON CONFLICT(guild_id) DO UPDATE SET
         wcl_api_key = COALESCE(excluded.wcl_api_key, guild_settings.wcl_api_key),
-        wcl_region = COALESCE(excluded.wcl_region, guild_settings.wcl_region)`)
-      .run(interaction.guildId, apiKey || null, region || null);
+        wcl_region = COALESCE(excluded.wcl_region, guild_settings.wcl_region),
+        wcl_realm = COALESCE(excluded.wcl_realm, guild_settings.wcl_realm)`)
+      .run(interaction.guildId, apiKey || null, region || null, realm || null);
     zoneCache.delete(interaction.guildId);
     const updates = [];
     if (apiKey) updates.push('API key saved');
     if (region) updates.push(`default region set to ${region}`);
+    if (realm) updates.push(`default realm set to ${realm}`);
     return interaction.reply({ content: `${updates.join(', ')}. /player-parse is ready to use.`, flags: MessageFlags.Ephemeral });
   }
 
-  const settings = db.prepare('SELECT wcl_api_key, wcl_region FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  const settings = db.prepare('SELECT wcl_api_key, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
   const keyText = settings?.wcl_api_key ? 'set' : 'not set';
   const regionText = settings?.wcl_region || 'not set (region: required each time)';
-  await interaction.reply({ content: `Warcraft Logs API key: ${keyText}\nDefault region: ${regionText}`, flags: MessageFlags.Ephemeral });
+  const realmText = settings?.wcl_realm || 'not set (Name-Realm required each time)';
+  await interaction.reply({ content: `Warcraft Logs API key: ${keyText}\nDefault region: ${regionText}\nDefault realm: ${realmText}`, flags: MessageFlags.Ephemeral });
 }
 
 // Zone lists barely change; cached per guild for 1 hour so autocomplete doesn't
@@ -418,7 +422,7 @@ async function getZones(guildId, apiKey) {
 }
 
 async function handlePlayerParse(interaction) {
-  const settings = db.prepare('SELECT wcl_api_key, wcl_region FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  const settings = db.prepare('SELECT wcl_api_key, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
   if (!settings?.wcl_api_key) {
     return interaction.reply({ content: 'No Warcraft Logs API key set for this server. Ask an admin to run /wcl-config.', flags: MessageFlags.Ephemeral });
   }
@@ -432,20 +436,21 @@ async function handlePlayerParse(interaction) {
   const zone = interaction.options.getString('zone');
   const metric = interaction.options.getString('metric') || 'dps';
   const { character, realm } = wcl.splitCharacter(player);
-  if (!realm) {
-    return interaction.reply({ content: "Include the realm, e.g. 'Fulfrans-Spineshatter'.", flags: MessageFlags.Ephemeral });
+  const resolvedRealm = realm || settings.wcl_realm;
+  if (!resolvedRealm) {
+    return interaction.reply({ content: "Include the realm, e.g. 'Fulfrans-Spineshatter', or ask an admin to set a default with /wcl-config.", flags: MessageFlags.Ephemeral });
   }
 
   let parses;
   try {
-    parses = await wcl.fetchCharacterParses(settings.wcl_api_key, { character, realm, region, zone, metric });
+    parses = await wcl.fetchCharacterParses(settings.wcl_api_key, { character, realm: resolvedRealm, region, zone, metric });
   } catch (err) {
     recordError('player-parse', err);
     return interaction.reply({ content: `Warcraft Logs lookup failed: ${err.message}`, flags: MessageFlags.Ephemeral });
   }
 
   if (parses.length === 0) {
-    return interaction.reply({ content: `No parses found for ${player} in that zone.`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `No parses found for ${character}-${resolvedRealm} in that zone.`, flags: MessageFlags.Ephemeral });
   }
 
   // Best parse per encounter (a character can have multiple kills/specs logged).
@@ -461,7 +466,7 @@ async function handlePlayerParse(interaction) {
     : null;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${player} - ${metric.toUpperCase()} parses`)
+    .setTitle(`${character}-${resolvedRealm} - ${metric.toUpperCase()} parses`)
     .setDescription(rows.map((r) => `**${r.encounterName}** - ${r.percentile ?? '?'}%ile (${Math.round(r.total || 0)} ${metric})${r.spec ? ` - ${r.spec}` : ''}`).join('\n'))
     .setFooter({ text: average !== null ? `Average: ${average}%ile across ${rows.length} bosses` : `${rows.length} bosses` });
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });

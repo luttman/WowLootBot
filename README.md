@@ -108,11 +108,12 @@ For loot masters (Manage Server permission by default, or a role set with
   optionally lock all commands to one channel (Manage Server admins only).
   `/loot-config` and `/help` are never locked, so the setting can always be
   changed.
-- `/wcl-config`: set this server's Warcraft Logs API key and default region so
-  `/player-parse` works (Manage Server admins only). Get a V1 API key from
-  https://www.warcraftlogs.com/profile (log in, "Web API" section). The key
-  is never shown back once saved, even to admins checking the current
-  setting.
+- `/wcl-config`: set this server's Warcraft Logs API key, default region, and
+  default realm so `/player-parse` works (Manage Server admins only). With a
+  default realm set, `/player-parse` only needs a character name, no
+  `-Realm` suffix. Get a V1 API key from https://www.warcraftlogs.com/profile
+  (log in, "Web API" section). The key is never shown back once saved, even
+  to admins checking the current setting.
 
 Results from the read commands are private (only visible to whoever ran the
 command) and paginated with buttons when there are more than 10 items.
