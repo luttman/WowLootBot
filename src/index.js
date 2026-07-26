@@ -2,11 +2,12 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } = require('discord.js');
 const db = require('./db');
 const { parseLootExport } = require('./parseLoot');
+const wcl = require('./wcl');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const PAGE_SIZE = 10;
-const CHANNEL_LOCK_EXEMPT = new Set(['loot-config', 'help', 'admin-status']);
+const CHANNEL_LOCK_EXEMPT = new Set(['loot-config', 'help', 'admin-status', 'wcl-config']);
 const BUTTON_TIMEOUT_MS = 5 * 60 * 1000; // how long Prev/Next buttons stay clickable before they're disabled
 
 // Player and owner names come as "Name-Realm" from the addons. We only display the name.
@@ -293,6 +294,7 @@ async function handleHelp(interaction) {
             '`/loot-add` - upload an export. Splits automatically into one raid per date.',
             '`/loot-clear` - delete a raid, or everything for this server (requires `confirm:true`).',
             '`/loot-config` - set which role (besides Manage Server) can use the two commands above, and optionally lock all commands to one channel.',
+            '`/wcl-config` - set this server\'s Warcraft Logs API key so `/player-parse` works.',
           ].join('\n'),
         },
         {
@@ -331,6 +333,7 @@ async function handleHelp(interaction) {
       '`/loot-raid` - items from a specific raid (start typing to pick one from the list).',
       '`/loot-player name:` - everything a player has won.',
       '`/loot-item name:` - who has won a specific item.',
+      '`/player-parse player: zone:` - a player\'s Warcraft Logs parses for a raid tier (needs an admin to set up `/wcl-config` first).',
       '',
       'Results are only visible to you, with ◀/▶ buttons if there are more than 10 items.',
       '',
@@ -369,6 +372,117 @@ async function handleAdminStatus(interaction) {
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
+// Lets a server admin store their own Warcraft Logs V1 API key (from
+// warcraftlogs.com/profile) so /player-parse works for their raiders. Never
+// echoes the key back, even in the "current status" view, since it's a secret.
+async function handleWclConfig(interaction) {
+  const apiKey = interaction.options.getString('api_key');
+  const region = interaction.options.getString('region');
+  const reset = interaction.options.getBoolean('reset');
+
+  if (reset) {
+    db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_region = NULL WHERE guild_id = ?').run(interaction.guildId);
+    return interaction.reply({ content: 'Removed this server\'s Warcraft Logs API key.', flags: MessageFlags.Ephemeral });
+  }
+
+  if (apiKey || region) {
+    db.prepare(`INSERT INTO guild_settings (guild_id, wcl_api_key, wcl_region) VALUES (?, ?, ?)
+      ON CONFLICT(guild_id) DO UPDATE SET
+        wcl_api_key = COALESCE(excluded.wcl_api_key, guild_settings.wcl_api_key),
+        wcl_region = COALESCE(excluded.wcl_region, guild_settings.wcl_region)`)
+      .run(interaction.guildId, apiKey || null, region || null);
+    zoneCache.delete(interaction.guildId);
+    const updates = [];
+    if (apiKey) updates.push('API key saved');
+    if (region) updates.push(`default region set to ${region}`);
+    return interaction.reply({ content: `${updates.join(', ')}. /player-parse is ready to use.`, flags: MessageFlags.Ephemeral });
+  }
+
+  const settings = db.prepare('SELECT wcl_api_key, wcl_region FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  const keyText = settings?.wcl_api_key ? 'set' : 'not set';
+  const regionText = settings?.wcl_region || 'not set (region: required each time)';
+  await interaction.reply({ content: `Warcraft Logs API key: ${keyText}\nDefault region: ${regionText}`, flags: MessageFlags.Ephemeral });
+}
+
+// Zone lists barely change; cached per guild for 1 hour so autocomplete doesn't
+// hit the Warcraft Logs API on every keystroke.
+const zoneCache = new Map(); // guildId -> { zones, expires }
+const ZONE_CACHE_MS = 60 * 60 * 1000;
+
+async function getZones(guildId, apiKey) {
+  const cached = zoneCache.get(guildId);
+  if (cached && cached.expires > Date.now()) return cached.zones;
+  const zones = await wcl.fetchZones(apiKey);
+  zoneCache.set(guildId, { zones, expires: Date.now() + ZONE_CACHE_MS });
+  return zones;
+}
+
+async function handlePlayerParse(interaction) {
+  const settings = db.prepare('SELECT wcl_api_key, wcl_region FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  if (!settings?.wcl_api_key) {
+    return interaction.reply({ content: 'No Warcraft Logs API key set for this server. Ask an admin to run /wcl-config.', flags: MessageFlags.Ephemeral });
+  }
+
+  const region = interaction.options.getString('region') || settings.wcl_region;
+  if (!region) {
+    return interaction.reply({ content: 'No region given and no default set. Pass `region:` or ask an admin to set one with /wcl-config.', flags: MessageFlags.Ephemeral });
+  }
+
+  const player = interaction.options.getString('player');
+  const zone = interaction.options.getString('zone');
+  const metric = interaction.options.getString('metric') || 'dps';
+  const { character, realm } = wcl.splitCharacter(player);
+  if (!realm) {
+    return interaction.reply({ content: "Include the realm, e.g. 'Fulfrans-Spineshatter'.", flags: MessageFlags.Ephemeral });
+  }
+
+  let parses;
+  try {
+    parses = await wcl.fetchCharacterParses(settings.wcl_api_key, { character, realm, region, zone, metric });
+  } catch (err) {
+    recordError('player-parse', err);
+    return interaction.reply({ content: `Warcraft Logs lookup failed: ${err.message}`, flags: MessageFlags.Ephemeral });
+  }
+
+  if (parses.length === 0) {
+    return interaction.reply({ content: `No parses found for ${player} in that zone.`, flags: MessageFlags.Ephemeral });
+  }
+
+  // Best parse per encounter (a character can have multiple kills/specs logged).
+  const bestByEncounter = new Map();
+  for (const p of parses) {
+    const existing = bestByEncounter.get(p.encounterName);
+    if (!existing || (p.percentile ?? -1) > (existing.percentile ?? -1)) bestByEncounter.set(p.encounterName, p);
+  }
+  const rows = [...bestByEncounter.values()];
+  const withPercentile = rows.filter((r) => typeof r.percentile === 'number');
+  const average = withPercentile.length
+    ? Math.round((withPercentile.reduce((sum, r) => sum + r.percentile, 0) / withPercentile.length) * 10) / 10
+    : null;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${player} - ${metric.toUpperCase()} parses`)
+    .setDescription(rows.map((r) => `**${r.encounterName}** - ${r.percentile ?? '?'}%ile (${Math.round(r.total || 0)} ${metric})${r.spec ? ` - ${r.spec}` : ''}`).join('\n'))
+    .setFooter({ text: average !== null ? `Average: ${average}%ile across ${rows.length} bosses` : `${rows.length} bosses` });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+}
+
+// Fires as the user types /player-parse's `zone` field. Pulled live from Warcraft
+// Logs rather than a hardcoded tier list, so it can't go stale as zones are added.
+async function handleWclZoneAutocomplete(interaction) {
+  const settings = db.prepare('SELECT wcl_api_key FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  if (!settings?.wcl_api_key) return interaction.respond([]);
+
+  const focused = interaction.options.getFocused().toLowerCase();
+  try {
+    const zones = await getZones(interaction.guildId, settings.wcl_api_key);
+    const matches = zones.filter((z) => z.name.toLowerCase().includes(focused)).slice(0, 25);
+    await interaction.respond(matches.map((z) => ({ name: z.name, value: String(z.id) })));
+  } catch {
+    await interaction.respond([]);
+  }
+}
+
 // Fires as the user types in /loot-raid's `name` field. Discord shows the returned
 // list as a clickable dropdown; the `value` sent back is the raid id, not its name.
 async function handleLootRaidAutocomplete(interaction) {
@@ -381,6 +495,7 @@ async function handleLootRaidAutocomplete(interaction) {
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isAutocomplete()) {
     if (interaction.commandName === 'loot-raid') await handleLootRaidAutocomplete(interaction);
+    if (interaction.commandName === 'player-parse') await handleWclZoneAutocomplete(interaction);
     return;
   }
   if (!interaction.isChatInputCommand()) return;
@@ -407,6 +522,8 @@ client.on('interactionCreate', async (interaction) => {
       case 'loot-config': return await handleLootConfig(interaction);
       case 'help': return await handleHelp(interaction);
       case 'admin-status': return await handleAdminStatus(interaction);
+      case 'wcl-config': return await handleWclConfig(interaction);
+      case 'player-parse': return await handlePlayerParse(interaction);
     }
   } catch (err) {
     recordError(`command:${interaction.commandName}`, err);

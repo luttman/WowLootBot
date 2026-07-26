@@ -47,6 +47,33 @@ const commands = [
     .setName('admin-status')
     .setDescription('Bot health check (bot owner only)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
+    .setName('wcl-config')
+    .setDescription('Set this server\'s Warcraft Logs API key for /player-parse (admins only)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addStringOption((o) => o.setName('api_key').setDescription('Your Warcraft Logs V1 API key, from warcraftlogs.com/profile'))
+    .addStringOption((o) => o.setName('region').setDescription('Default region for /player-parse').addChoices(
+      { name: 'US', value: 'US' },
+      { name: 'EU', value: 'EU' },
+      { name: 'KR', value: 'KR' },
+      { name: 'TW', value: 'TW' },
+    ))
+    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key and default region')),
+  new SlashCommandBuilder()
+    .setName('player-parse')
+    .setDescription('Show a player\'s Warcraft Logs parses for a raid tier')
+    .addStringOption((o) => o.setName('player').setDescription("Character name, e.g. 'Fulfrans-Spineshatter'").setRequired(true))
+    .addStringOption((o) => o.setName('zone').setDescription('Start typing to pick a raid tier').setRequired(true).setAutocomplete(true))
+    .addStringOption((o) => o.setName('region').setDescription('Overrides this server\'s default region').addChoices(
+      { name: 'US', value: 'US' },
+      { name: 'EU', value: 'EU' },
+      { name: 'KR', value: 'KR' },
+      { name: 'TW', value: 'TW' },
+    ))
+    .addStringOption((o) => o.setName('metric').setDescription('Defaults to dps').addChoices(
+      { name: 'DPS', value: 'dps' },
+      { name: 'HPS', value: 'hps' },
+    )),
 ].map((c) => c.toJSON());
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);

@@ -80,5 +80,11 @@ const settingsColumns = db.prepare("PRAGMA table_info(guild_settings)").all().ma
 if (!settingsColumns.includes('channel_id')) {
   db.exec('ALTER TABLE guild_settings ADD COLUMN channel_id TEXT');
 }
+if (!settingsColumns.includes('wcl_api_key')) {
+  db.exec('ALTER TABLE guild_settings ADD COLUMN wcl_api_key TEXT');
+}
+if (!settingsColumns.includes('wcl_region')) {
+  db.exec('ALTER TABLE guild_settings ADD COLUMN wcl_region TEXT');
+}
 
 module.exports = db;

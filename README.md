@@ -91,6 +91,9 @@ For everyone:
 - `/loot-raid`: items from a specific raid, pick one from the autocomplete list
 - `/loot-player name:`: everything a player has won
 - `/loot-item name:`: who has won a specific item
+- `/player-parse player: zone:`: a character's Warcraft Logs parses for a raid
+  tier, e.g. `/player-parse player:Fulfrans-Spineshatter zone:Karazhan`. Needs
+  an admin to set up `/wcl-config` for the server first.
 - `/help`: usage guide, with a loot master section covering exports
 
 For loot masters (Manage Server permission by default, or a role set with
@@ -105,6 +108,11 @@ For loot masters (Manage Server permission by default, or a role set with
   optionally lock all commands to one channel (Manage Server admins only).
   `/loot-config` and `/help` are never locked, so the setting can always be
   changed.
+- `/wcl-config`: set this server's Warcraft Logs API key and default region so
+  `/player-parse` works (Manage Server admins only). Get a V1 API key from
+  https://www.warcraftlogs.com/profile (log in, "Web API" section). The key
+  is never shown back once saved, even to admins checking the current
+  setting.
 
 Results from the read commands are private (only visible to whoever ran the
 command) and paginated with buttons when there are more than 10 items.
@@ -128,6 +136,22 @@ Auto-detected from the file or pasted text, no need to say which one it is:
 
 See `/help lootmaster` in Discord for the exact steps to export from each
 addon.
+
+## Warcraft Logs integration (/player-parse)
+
+`src/wcl.js` wraps the Warcraft Logs V1 API. It was built from the published
+API spec, not verified against a live key (no test key was available while
+writing it), the first real `/player-parse` call is effectively the first
+integration test. Two things worth checking once you have a real server set
+up with `/wcl-config`:
+
+- The percentile shown is derived from the API's `rank`/`outOf` fields
+  (`percentileFromRank()` in `wcl.js`), since the V1 spec doesn't document a
+  direct `percentile` field. If a real response does include one, that
+  function should prefer it instead.
+- `/player-parse`'s `zone` autocomplete lists whatever `/zones` returns for
+  that server's own API key, rather than a hardcoded tier list, so it reflects
+  whatever raids that Warcraft Logs account actually has access to.
 
 ## Data storage
 
