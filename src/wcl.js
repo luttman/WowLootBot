@@ -1,13 +1,19 @@
-// Thin wrapper around the Warcraft Logs V1 API (https://www.warcraftlogs.com/v1/docs).
-// Each Discord server supplies its own API key via /wcl-config, generated from
-// their own Warcraft Logs account at https://www.warcraftlogs.com/profile.
+// Thin wrapper around the Warcraft Logs V1 API. Each Discord server supplies
+// its own API key via /wcl-config, generated from their own Warcraft Logs
+// account at https://www.warcraftlogs.com/profile.
+//
+// Classic content (including TBC) lives entirely on a separate host,
+// classic.warcraftlogs.com, not www.warcraftlogs.com (which is retail-only).
+// There is no further split by expansion (no tbc./wotlk. subdomains exist,
+// verified directly) - classic.warcraftlogs.com's /zones lists every raid
+// across every Classic era it has ever tracked, TBC included.
 //
 // NOTE: built from the V1 swagger spec, not verified against a live key. The V1
 // endpoint documents `rank`/`outOf` per parse, not a direct `percentile` field -
 // percentileFromRank() below derives one from those. If real responses turn out
 // to include a `percentile` field directly, prefer that instead once confirmed.
 
-const BASE_URL = 'https://www.warcraftlogs.com/v1';
+const BASE_URL = 'https://classic.warcraftlogs.com/v1';
 
 async function wclGet(path, params, apiKey) {
   const url = new URL(BASE_URL + path);
