@@ -46,6 +46,19 @@ function formatUptime(seconds) {
   return `${d}d ${h}h ${m}m`;
 }
 
+// Matches Warcraft Logs' own percentile color tiers (grey/green/blue/purple/
+// orange/pink/gold), using colored square emoji since Discord embeds can't
+// color individual lines of text.
+function percentileEmoji(percentile) {
+  if (percentile === null || percentile === undefined) return '⬜';
+  if (percentile >= 100) return '🟨';
+  if (percentile >= 95) return '🟧';
+  if (percentile >= 75) return '🟪';
+  if (percentile >= 50) return '🟦';
+  if (percentile >= 25) return '🟩';
+  return '⬜';
+}
+
 // Formats one loot row for display. Each row keeps its own date/owner (not the raid's),
 // since a single import can span multiple actual raid nights and loot masters.
 function lootLine(row) {
@@ -486,12 +499,15 @@ async function handlePlayerParse(interaction) {
   const rows = [...bestByEncounter.values()];
   const withPercentile = rows.filter((r) => typeof r.percentile === 'number');
   const average = withPercentile.length
-    ? Math.round((withPercentile.reduce((sum, r) => sum + r.percentile, 0) / withPercentile.length) * 10) / 10
+    ? Math.round(withPercentile.reduce((sum, r) => sum + r.percentile, 0) / withPercentile.length)
     : null;
 
   const embed = new EmbedBuilder()
     .setTitle(`${character}-${resolvedRealm} - ${metric.toUpperCase()} parses`)
-    .setDescription(rows.map((r) => `**${r.encounterName}** - ${r.percentile ?? '?'}%ile (${Math.round(r.total || 0)} ${metric})${r.spec ? ` - ${r.spec}` : ''}`).join('\n'))
+    .setDescription(rows.map((r) => {
+      const pct = typeof r.percentile === 'number' ? Math.round(r.percentile) : null;
+      return `${percentileEmoji(pct)} **${r.encounterName}** - ${pct ?? '?'}%ile (${Math.round(r.total || 0)} ${metric})${r.spec ? ` - ${r.spec}` : ''}`;
+    }).join('\n'))
     .setFooter({ text: average !== null ? `Average: ${average}%ile across ${rows.length} bosses` : `${rows.length} bosses` });
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
