@@ -52,6 +52,12 @@ const commands = [
     .setDescription('Set this server\'s Warcraft Logs API key for /player-parse (admins only)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((o) => o.setName('api_key').setDescription('Your Warcraft Logs V1 API key, from warcraftlogs.com/profile'))
+    .addStringOption((o) => o.setName('site').setDescription('Which Warcraft Logs site your realm is tracked on').addChoices(
+      { name: 'Classic', value: 'classic' },
+      { name: 'Fresh', value: 'fresh' },
+      { name: 'Season of Discovery', value: 'sod' },
+      { name: 'Vanilla', value: 'vanilla' },
+    ))
     .addStringOption((o) => o.setName('region').setDescription('Default region for /player-parse').addChoices(
       { name: 'US', value: 'US' },
       { name: 'EU', value: 'EU' },
@@ -59,7 +65,7 @@ const commands = [
       { name: 'TW', value: 'TW' },
     ))
     .addStringOption((o) => o.setName('realm').setDescription("Default realm, e.g. 'Spineshatter', so /player-parse doesn't need Name-Realm"))
-    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key, default region, and default realm'))
+    .addBooleanOption((o) => o.setName('reset').setDescription('Remove all stored Warcraft Logs settings for this server'))
     .addBooleanOption((o) => o.setName('list_zones').setDescription('Debug: show the raw zone id/name list from Warcraft Logs')),
   new SlashCommandBuilder()
     .setName('player-parse')

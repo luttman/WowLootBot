@@ -294,7 +294,7 @@ async function handleHelp(interaction) {
             '`/loot-add` - upload an export. Splits automatically into one raid per date.',
             '`/loot-clear` - delete a raid, or everything for this server (requires `confirm:true`).',
             '`/loot-config` - set which role (besides Manage Server) can use the two commands above, and optionally lock all commands to one channel.',
-            '`/wcl-config` - set this server\'s Warcraft Logs API key, default region, and default realm so `/player-parse` works with just a character name.',
+            '`/wcl-config` - set this server\'s Warcraft Logs API key, site, default region, and default realm so `/player-parse` works with just a character name. `site` matters: Warcraft Logs tracks Classic/Fresh/Season of Discovery/Vanilla realms separately, with different zone numbering each, so pick whichever matches your realm.',
           ].join('\n'),
         },
         {
@@ -377,6 +377,7 @@ async function handleAdminStatus(interaction) {
 // echoes the key back, even in the "current status" view, since it's a secret.
 async function handleWclConfig(interaction) {
   const apiKey = interaction.options.getString('api_key');
+  const site = interaction.options.getString('site');
   const region = interaction.options.getString('region');
   const realm = interaction.options.getString('realm');
   const reset = interaction.options.getBoolean('reset');
@@ -385,13 +386,13 @@ async function handleWclConfig(interaction) {
   // Temporary debug aid while pinning down why zone names/ids look wrong -
   // dumps whatever the Warcraft Logs API actually returns, raw, id and all.
   if (listZones) {
-    const settings = db.prepare('SELECT wcl_api_key FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
-    if (!settings?.wcl_api_key) {
-      return interaction.reply({ content: 'Set an API key first with /wcl-config api_key:', flags: MessageFlags.Ephemeral });
+    const settings = db.prepare('SELECT wcl_api_key, wcl_site FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+    if (!settings?.wcl_api_key || !settings.wcl_site) {
+      return interaction.reply({ content: 'Set an API key and site first with /wcl-config api_key: site:', flags: MessageFlags.Ephemeral });
     }
     let zones;
     try {
-      zones = await wcl.fetchZones(settings.wcl_api_key);
+      zones = await wcl.fetchZones(settings.wcl_site, settings.wcl_api_key);
     } catch (err) {
       return interaction.reply({ content: `Warcraft Logs lookup failed: ${err.message}`, flags: MessageFlags.Ephemeral });
     }
@@ -402,30 +403,33 @@ async function handleWclConfig(interaction) {
   }
 
   if (reset) {
-    db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_region = NULL, wcl_realm = NULL WHERE guild_id = ?').run(interaction.guildId);
-    return interaction.reply({ content: 'Removed this server\'s Warcraft Logs API key, default region, and default realm.', flags: MessageFlags.Ephemeral });
+    db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_site = NULL, wcl_region = NULL, wcl_realm = NULL WHERE guild_id = ?').run(interaction.guildId);
+    return interaction.reply({ content: 'Removed all of this server\'s Warcraft Logs settings.', flags: MessageFlags.Ephemeral });
   }
 
-  if (apiKey || region || realm) {
-    db.prepare(`INSERT INTO guild_settings (guild_id, wcl_api_key, wcl_region, wcl_realm) VALUES (?, ?, ?, ?)
+  if (apiKey || site || region || realm) {
+    db.prepare(`INSERT INTO guild_settings (guild_id, wcl_api_key, wcl_site, wcl_region, wcl_realm) VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(guild_id) DO UPDATE SET
         wcl_api_key = COALESCE(excluded.wcl_api_key, guild_settings.wcl_api_key),
+        wcl_site = COALESCE(excluded.wcl_site, guild_settings.wcl_site),
         wcl_region = COALESCE(excluded.wcl_region, guild_settings.wcl_region),
         wcl_realm = COALESCE(excluded.wcl_realm, guild_settings.wcl_realm)`)
-      .run(interaction.guildId, apiKey || null, region || null, realm || null);
+      .run(interaction.guildId, apiKey || null, site || null, region || null, realm || null);
     zoneCache.delete(interaction.guildId);
     const updates = [];
     if (apiKey) updates.push('API key saved');
+    if (site) updates.push(`site set to ${site}`);
     if (region) updates.push(`default region set to ${region}`);
     if (realm) updates.push(`default realm set to ${realm}`);
     return interaction.reply({ content: `${updates.join(', ')}. /player-parse is ready to use.`, flags: MessageFlags.Ephemeral });
   }
 
-  const settings = db.prepare('SELECT wcl_api_key, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  const settings = db.prepare('SELECT wcl_api_key, wcl_site, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
   const keyText = settings?.wcl_api_key ? 'set' : 'not set';
+  const siteText = settings?.wcl_site || 'not set (required - see /help lootmaster)';
   const regionText = settings?.wcl_region || 'not set (region: required each time)';
   const realmText = settings?.wcl_realm || 'not set (Name-Realm required each time)';
-  await interaction.reply({ content: `Warcraft Logs API key: ${keyText}\nDefault region: ${regionText}\nDefault realm: ${realmText}`, flags: MessageFlags.Ephemeral });
+  await interaction.reply({ content: `Warcraft Logs API key: ${keyText}\nSite: ${siteText}\nDefault region: ${regionText}\nDefault realm: ${realmText}`, flags: MessageFlags.Ephemeral });
 }
 
 // Zone lists barely change; cached per guild for 1 hour so autocomplete doesn't
@@ -433,18 +437,18 @@ async function handleWclConfig(interaction) {
 const zoneCache = new Map(); // guildId -> { zones, expires }
 const ZONE_CACHE_MS = 60 * 60 * 1000;
 
-async function getZones(guildId, apiKey) {
+async function getZones(guildId, site, apiKey) {
   const cached = zoneCache.get(guildId);
   if (cached && cached.expires > Date.now()) return cached.zones;
-  const zones = await wcl.fetchZones(apiKey);
+  const zones = await wcl.fetchZones(site, apiKey);
   zoneCache.set(guildId, { zones, expires: Date.now() + ZONE_CACHE_MS });
   return zones;
 }
 
 async function handlePlayerParse(interaction) {
-  const settings = db.prepare('SELECT wcl_api_key, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
-  if (!settings?.wcl_api_key) {
-    return interaction.reply({ content: 'No Warcraft Logs API key set for this server. Ask an admin to run /wcl-config.', flags: MessageFlags.Ephemeral });
+  const settings = db.prepare('SELECT wcl_api_key, wcl_site, wcl_region, wcl_realm FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  if (!settings?.wcl_api_key || !settings.wcl_site) {
+    return interaction.reply({ content: 'Warcraft Logs isn\'t set up for this server yet. Ask an admin to run /wcl-config with an api_key and site.', flags: MessageFlags.Ephemeral });
   }
 
   const region = interaction.options.getString('region') || settings.wcl_region;
@@ -463,7 +467,7 @@ async function handlePlayerParse(interaction) {
 
   let parses;
   try {
-    parses = await wcl.fetchCharacterParses(settings.wcl_api_key, { character, realm: resolvedRealm, region, zone, metric });
+    parses = await wcl.fetchCharacterParses(settings.wcl_site, settings.wcl_api_key, { character, realm: resolvedRealm, region, zone, metric });
   } catch (err) {
     recordError('player-parse', err);
     return interaction.reply({ content: `Warcraft Logs lookup failed: ${err.message}`, flags: MessageFlags.Ephemeral });
@@ -495,12 +499,12 @@ async function handlePlayerParse(interaction) {
 // Fires as the user types /player-parse's `zone` field. Pulled live from Warcraft
 // Logs rather than a hardcoded tier list, so it can't go stale as zones are added.
 async function handleWclZoneAutocomplete(interaction) {
-  const settings = db.prepare('SELECT wcl_api_key FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
-  if (!settings?.wcl_api_key) return interaction.respond([]);
+  const settings = db.prepare('SELECT wcl_api_key, wcl_site FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+  if (!settings?.wcl_api_key || !settings.wcl_site) return interaction.respond([]);
 
   const focused = interaction.options.getFocused().toLowerCase();
   try {
-    const zones = await getZones(interaction.guildId, settings.wcl_api_key);
+    const zones = await getZones(interaction.guildId, settings.wcl_site, settings.wcl_api_key);
     const matches = zones.filter((z) => z.name.toLowerCase().includes(focused)).slice(0, 25);
     await interaction.respond(matches.map((z) => ({ name: z.name, value: String(z.id) })));
   } catch {

@@ -89,5 +89,8 @@ if (!settingsColumns.includes('wcl_region')) {
 if (!settingsColumns.includes('wcl_realm')) {
   db.exec('ALTER TABLE guild_settings ADD COLUMN wcl_realm TEXT');
 }
+if (!settingsColumns.includes('wcl_site')) {
+  db.exec('ALTER TABLE guild_settings ADD COLUMN wcl_site TEXT');
+}
 
 module.exports = db;

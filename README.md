@@ -108,11 +108,13 @@ For loot masters (Manage Server permission by default, or a role set with
   optionally lock all commands to one channel (Manage Server admins only).
   `/loot-config` and `/help` are never locked, so the setting can always be
   changed.
-- `/wcl-config`: set this server's Warcraft Logs API key, default region, and
-  default realm so `/player-parse` works (Manage Server admins only). With a
-  default realm set, `/player-parse` only needs a character name, no
-  `-Realm` suffix. Get a V1 API key from https://www.warcraftlogs.com/profile
-  (log in, "Web API" section). The key is never shown back once saved, even
+- `/wcl-config`: set this server's Warcraft Logs API key, site (`classic`,
+  `fresh`, `sod`, or `vanilla`, whichever matches your realm - see below),
+  default region, and default realm so `/player-parse` works (Manage Server
+  admins only). With a default realm set, `/player-parse` only needs a
+  character name, no `-Realm` suffix. Get a V1 API key from
+  https://www.warcraftlogs.com/profile (log in, "Web API" section). The key
+  is never shown back once saved, even
   to admins checking the current setting.
 
 Results from the read commands are private (only visible to whoever ran the
@@ -140,10 +142,17 @@ addon.
 
 ## Warcraft Logs integration (/player-parse)
 
-`src/wcl.js` wraps the Warcraft Logs V1 API, using `classic.warcraftlogs.com`
-(not `www.warcraftlogs.com`, which is retail-only).
+`src/wcl.js` wraps the Warcraft Logs V1 API. Warcraft Logs splits Classic
+content across several separate hosts, one per realm type, each with its own
+independent zone numbering: `classic.warcraftlogs.com`, `fresh`, `sod`
+(Season of Discovery), `vanilla`. Confirmed directly: a Spineshatter character
+is tracked on `fresh.warcraftlogs.com` using zone id `1056` for SSC/TK, while
+`classic.warcraftlogs.com` (a different host, same API shape) uses `1501` for
+the same tier. There is no way to guess which host a given realm is on, so
+`/wcl-config site:` is required, not inferred or hardcoded.
 
-`/zones` returns two generations of zone entries, confirmed by live testing:
+On `classic.warcraftlogs.com` specifically, `/zones` returns two generations
+of entries, confirmed by live testing:
 
 - ids below 1500: one zone per raid *instance* (e.g. `1007` "Karazhan",
   `1008` "Gruul / Magtheridon"). These no longer work with
@@ -154,8 +163,10 @@ addon.
   which both works for character parses and matches what "tier" (T4, T5, ...)
   means to this bot's users in the first place.
 
-`fetchZones()` filters to only the 1500+ generation, so `/player-parse`'s
-`zone` autocomplete only ever offers zones that actually return data.
+`fetchZones()` filters to this 1500+ generation only when `site` is
+`classic`; other sites are not filtered, since that split has only been
+confirmed on `classic` (the `fresh` example above, `1056`, would have been
+wrongly hidden by the same filter).
 
 One thing still not verified against a live key: the percentile shown is
 derived from the API's `rank`/`outOf` fields (`percentileFromRank()` in

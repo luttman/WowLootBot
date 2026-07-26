@@ -2,21 +2,35 @@
 // its own API key via /wcl-config, generated from their own Warcraft Logs
 // account at https://www.warcraftlogs.com/profile.
 //
-// Classic content (including TBC) lives entirely on a separate host,
-// classic.warcraftlogs.com, not www.warcraftlogs.com (which is retail-only).
-// There is no further split by expansion (no tbc./wotlk. subdomains exist,
-// verified directly) - classic.warcraftlogs.com's /zones lists every raid
-// across every Classic era it has ever tracked, TBC included.
+// Warcraft Logs splits Classic content across several separate hosts, one per
+// realm type, each with its OWN independent zone numbering - confirmed
+// directly: Pluttman-Spineshatter's real character page is
+// fresh.warcraftlogs.com/character/eu/spineshatter/pluttman, using zone=1056
+// for SSC/TK, while classic.warcraftlogs.com (a different host entirely) uses
+// 1501 for the same tier. There is no way to guess which host a given realm
+// is on, so it is a per-server setting via /wcl-config, not hardcoded.
 //
-// NOTE: built from the V1 swagger spec, not verified against a live key. The V1
-// endpoint documents `rank`/`outOf` per parse, not a direct `percentile` field -
-// percentileFromRank() below derives one from those. If real responses turn out
-// to include a `percentile` field directly, prefer that instead once confirmed.
+// NOTE: built from the V1 swagger spec, not verified against a live key for
+// every site. The V1 endpoint documents `rank`/`outOf` per parse, not a
+// direct `percentile` field - percentileFromRank() below derives one from
+// those. If a real response does include a `percentile` field directly,
+// prefer that instead once confirmed.
 
-const BASE_URL = 'https://classic.warcraftlogs.com/v1';
+const SITES = {
+  classic: 'classic.warcraftlogs.com',
+  fresh: 'fresh.warcraftlogs.com',
+  sod: 'sod.warcraftlogs.com',
+  vanilla: 'vanilla.warcraftlogs.com',
+};
 
-async function wclGet(path, params, apiKey) {
-  const url = new URL(BASE_URL + path);
+function baseUrl(site) {
+  const host = SITES[site];
+  if (!host) throw new Error(`Unknown Warcraft Logs site "${site}". Expected one of: ${Object.keys(SITES).join(', ')}.`);
+  return `https://${host}/v1`;
+}
+
+async function wclGet(site, path, params, apiKey) {
+  const url = new URL(baseUrl(site) + path);
   url.searchParams.set('api_key', apiKey);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
@@ -29,23 +43,21 @@ async function wclGet(path, params, apiKey) {
   return res.json();
 }
 
-// classic.warcraftlogs.com's /zones returns two generations of entries:
-// - ids below 1500: one zone per raid *instance* (e.g. 1007 "Karazhan",
-//   1008 "Gruul / Magtheridon"). Confirmed by testing that these no longer
-//   work with /parses/character - they return no data even for characters
-//   with real logged parses.
-// - ids 1500+: one zone per raid *tier* (e.g. 1502 "TBC Raids (10-Man Tier
-//   4)", grouping Karazhan + Gruul + Magtheridon together), which is both
-//   what actually works for character parses and matches what this bot's
-//   users mean by "tier" (T4, T5, ...) in the first place.
-// Only the 1500+ generation is exposed here.
-const MIN_USABLE_ZONE_ID = 1500;
+// On classic.warcraftlogs.com specifically, /zones returns two generations of
+// entries: ids below 1500 are one zone per raid *instance* (e.g. 1007
+// "Karazhan"), confirmed to no longer work with /parses/character even for
+// characters with real logged parses; ids 1500+ are one zone per raid *tier*
+// (e.g. 1502 "TBC Raids (10-Man Tier 4)"), which do work. This split is only
+// confirmed for the classic host - other sites (fresh, sod, vanilla) may use
+// a different numbering entirely, so it is not filtered for them.
+const CLASSIC_MIN_USABLE_ZONE_ID = 1500;
 
 // List of raid zones this account's key can see, used to populate /player-parse's
 // zone autocomplete instead of a hardcoded tier->zone-id map that could go stale.
-async function fetchZones(apiKey) {
-  const zones = await wclGet('/zones', {}, apiKey);
-  return (Array.isArray(zones) ? zones : []).filter((z) => z.id >= MIN_USABLE_ZONE_ID);
+async function fetchZones(site, apiKey) {
+  const zones = await wclGet(site, '/zones', {}, apiKey);
+  const list = Array.isArray(zones) ? zones : [];
+  return site === 'classic' ? list.filter((z) => z.id >= CLASSIC_MIN_USABLE_ZONE_ID) : list;
 }
 
 // character/realm split on the last "-", matching the "Name-Realm" convention
@@ -61,8 +73,9 @@ function percentileFromRank(rank, outOf) {
   return Math.round((1 - (rank - 1) / outOf) * 1000) / 10;
 }
 
-async function fetchCharacterParses(apiKey, { character, realm, region, zone, encounter, metric }) {
+async function fetchCharacterParses(site, apiKey, { character, realm, region, zone, encounter, metric }) {
   const parses = await wclGet(
+    site,
     `/parses/character/${encodeURIComponent(character)}/${encodeURIComponent(realm)}/${encodeURIComponent(region)}`,
     { zone, encounter, metric },
     apiKey,
@@ -76,4 +89,4 @@ async function fetchCharacterParses(apiKey, { character, realm, region, zone, en
   }));
 }
 
-module.exports = { fetchZones, fetchCharacterParses, splitCharacter };
+module.exports = { SITES, fetchZones, fetchCharacterParses, splitCharacter };
