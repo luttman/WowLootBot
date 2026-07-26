@@ -59,7 +59,8 @@ const commands = [
       { name: 'TW', value: 'TW' },
     ))
     .addStringOption((o) => o.setName('realm').setDescription("Default realm, e.g. 'Spineshatter', so /player-parse doesn't need Name-Realm"))
-    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key, default region, and default realm')),
+    .addBooleanOption((o) => o.setName('reset').setDescription('Remove the stored API key, default region, and default realm'))
+    .addBooleanOption((o) => o.setName('list_zones').setDescription('Debug: show the raw zone id/name list from Warcraft Logs')),
   new SlashCommandBuilder()
     .setName('player-parse')
     .setDescription('Show a player\'s Warcraft Logs parses for a raid tier')

@@ -380,6 +380,26 @@ async function handleWclConfig(interaction) {
   const region = interaction.options.getString('region');
   const realm = interaction.options.getString('realm');
   const reset = interaction.options.getBoolean('reset');
+  const listZones = interaction.options.getBoolean('list_zones');
+
+  // Temporary debug aid while pinning down why zone names/ids look wrong -
+  // dumps whatever the Warcraft Logs API actually returns, raw, id and all.
+  if (listZones) {
+    const settings = db.prepare('SELECT wcl_api_key FROM guild_settings WHERE guild_id = ?').get(interaction.guildId);
+    if (!settings?.wcl_api_key) {
+      return interaction.reply({ content: 'Set an API key first with /wcl-config api_key:', flags: MessageFlags.Ephemeral });
+    }
+    let zones;
+    try {
+      zones = await wcl.fetchZones(settings.wcl_api_key);
+    } catch (err) {
+      return interaction.reply({ content: `Warcraft Logs lookup failed: ${err.message}`, flags: MessageFlags.Ephemeral });
+    }
+    const list = Array.isArray(zones) ? zones : [];
+    const lines = list.map((z) => `${z.id}: ${z.name}`).join('\n').slice(0, 3900);
+    const embed = new EmbedBuilder().setTitle(`Raw zone list (${list.length} total)`).setDescription(lines || 'No zones returned.');
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
 
   if (reset) {
     db.prepare('UPDATE guild_settings SET wcl_api_key = NULL, wcl_region = NULL, wcl_realm = NULL WHERE guild_id = ?').run(interaction.guildId);
