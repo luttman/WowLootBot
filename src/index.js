@@ -182,7 +182,7 @@ async function handleLootAdd(interaction) {
 // the same layout, page size, and Prev/Next button behavior.
 
 async function handleLootLast(interaction) {
-  const raid = db.prepare('SELECT * FROM raids WHERE guild_id = ? ORDER BY id DESC LIMIT 1').get(interaction.guildId);
+  const raid = db.prepare('SELECT * FROM raids WHERE guild_id = ? ORDER BY raid_date DESC, id DESC LIMIT 1').get(interaction.guildId);
   if (!raid) return interaction.reply({ content: 'No raids added yet.', flags: MessageFlags.Ephemeral });
   const rows = db.prepare('SELECT * FROM loot WHERE raid_id = ? ORDER BY id').all(raid.id);
   await replyPaginated(interaction, raid.name, rows);
@@ -209,7 +209,9 @@ async function handleLootPlayer(interaction) {
 }
 
 async function handleLootItem(interaction) {
-  const query = interaction.options.getString('name');
+  // Item names are stored without the [brackets] WoW chat links use, so strip
+  // them here too in case someone pastes a copied item link straight in.
+  const query = interaction.options.getString('name').replace(/[[\]]/g, '');
   const rows = db.prepare(`SELECT loot.* FROM loot JOIN raids ON loot.raid_id = raids.id
     WHERE raids.guild_id = ? AND loot.item_name LIKE ?
     ORDER BY loot.item_date DESC, loot.id DESC LIMIT 50`).all(interaction.guildId, `%${query}%`);
